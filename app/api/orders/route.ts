@@ -1,11 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { query, execute, transaction } from '@/lib/db';
-import type { Order, OrderItem, CreateOrderDTO, OrderWithDetails } from '@/lib/types';
+import { query, transaction } from '@/lib/db';
+import type { OrderItem, CreateOrderDTO, OrderWithDetails } from '@/lib/types';
+
+// Type for order query result with temporary customer fields
+type OrderQueryResult = OrderWithDetails & {
+  customer_id: number;
+  customer_name: string;
+  customer_email: string;
+  customer_created_at: Date;
+};
+
+// Type for order item query result with temporary product fields
+type OrderItemQueryResult = OrderItem & {
+  product_id: number;
+  product_name: string;
+  product_price: number;
+  product_stock: number;
+  product_created_at: Date;
+};
 
 // GET /api/orders - Get all orders with customer and item details
 export async function GET() {
   try {
-    const orders = await query<OrderWithDetails>(
+    const orders = await query<OrderQueryResult>(
       `SELECT
         o.*,
         c.id as customer_id,
@@ -17,49 +34,56 @@ export async function GET() {
        ORDER BY o.created_at DESC`
     );
 
-    // Fetch order items for each order
-    for (const order of orders) {
-      const items = await query<
-        OrderItem & { product: { id: number; name: string } }
-      >(
+    // Fetch order items for each order and transform
+    const result: OrderWithDetails[] = [];
+    for (const rawOrder of orders) {
+      const items = await query<OrderItemQueryResult>(
         `SELECT
           oi.*,
           p.id as product_id,
-          p.name as product_name
+          p.name as product_name,
+          p.price as product_price,
+          p.stock as product_stock,
+          p.created_at as product_created_at
          FROM order_items oi
          INNER JOIN products p ON oi.product_id = p.id
          WHERE oi.order_id = ?`,
-        [order.id]
+        [rawOrder.id]
       );
 
-      // Transform the result to match the expected structure
-      order.items = items.map(item => ({
-        id: item.id,
-        order_id: item.order_id,
-        product_id: item.product_id,
-        quantity: item.quantity,
-        price: item.price,
-        product: {
-          id: item.product_id,
-          name: item.product_name
-        }
-      }));
-
-      // Transform customer data
-      order.customer = {
-        id: order.customer_id as any,
-        name: order.customer_name as any,
-        email: order.customer_email as any,
-        created_at: order.customer_created_at as any
+      // Build clean order object
+      const order: OrderWithDetails = {
+        id: rawOrder.id,
+        customer_id: rawOrder.customer_id,
+        total: rawOrder.total,
+        status: rawOrder.status,
+        created_at: rawOrder.created_at,
+        customer: {
+          id: rawOrder.customer_id,
+          name: rawOrder.customer_name,
+          email: rawOrder.customer_email,
+          created_at: rawOrder.customer_created_at
+        },
+        items: items.map(item => ({
+          id: item.id,
+          order_id: item.order_id,
+          product_id: item.product_id,
+          quantity: item.quantity,
+          price: item.price,
+          product: {
+            id: item.product_id,
+            name: item.product_name,
+            price: item.product_price,
+            stock: item.product_stock,
+            created_at: item.product_created_at
+          }
+        }))
       };
 
-      // Clean up temporary properties
-      delete (order as any).customer_name;
-      delete (order as any).customer_email;
-      delete (order as any).customer_created_at;
+      result.push(order);
     }
 
-    return NextResponse.json(orders, { status: 200 });
+    return NextResponse.json(result, { status: 200 });
   } catch (error) {
     console.error('Error fetching orders:', error);
     return NextResponse.json(
@@ -129,7 +153,8 @@ export async function POST(request: NextRequest) {
         productIds
       );
 
-      const productMap = new Map((products as any[]).map(p => [p.id, p]));
+      type ProductRow = { id: number; name: string; price: number; stock: number };
+      const productMap = new Map((products as ProductRow[]).map(p => [p.id, p]));
 
       // Validate all products exist and have sufficient stock
       for (const item of items) {
@@ -165,7 +190,8 @@ export async function POST(request: NextRequest) {
         [customer_id, total, 'pending']
       );
 
-      const orderId = (orderResult as any).insertId;
+      type InsertResult = { insertId: number; affectedRows: number };
+      const orderId = (orderResult as InsertResult).insertId;
 
       // Create order items and update stock
       for (const itemData of orderItemsData) {
@@ -185,7 +211,7 @@ export async function POST(request: NextRequest) {
     });
 
     // Fetch the complete order with details
-    const newOrder = await query<OrderWithDetails>(
+    const newOrder = await query<OrderQueryResult>(
       `SELECT
         o.*,
         c.id as customer_id,
@@ -198,49 +224,57 @@ export async function POST(request: NextRequest) {
       [result.orderId]
     );
 
-    const orderItems = await query<
-      OrderItem & { product: { id: number; name: string } }
-    >(
+    const orderItems = await query<OrderItemQueryResult>(
       `SELECT
         oi.*,
         p.id as product_id,
-        p.name as product_name
+        p.name as product_name,
+        p.price as product_price,
+        p.stock as product_stock,
+        p.created_at as product_created_at
        FROM order_items oi
        INNER JOIN products p ON oi.product_id = p.id
        WHERE oi.order_id = ?`,
       [result.orderId]
     );
 
-    const order = newOrder[0];
-    order.items = orderItems.map(item => ({
-      id: item.id,
-      order_id: item.order_id,
-      product_id: item.product_id,
-      quantity: item.quantity,
-      price: item.price,
-      product: {
-        id: item.product_id,
-        name: item.product_name
-      }
-    }));
+    const rawOrder = newOrder[0];
 
-    order.customer = {
-      id: order.customer_id as any,
-      name: order.customer_name as any,
-      email: order.customer_email as any,
-      created_at: order.customer_created_at as any
+    // Build clean order object
+    const order: OrderWithDetails = {
+      id: rawOrder.id,
+      customer_id: rawOrder.customer_id,
+      total: rawOrder.total,
+      status: rawOrder.status,
+      created_at: rawOrder.created_at,
+      customer: {
+        id: rawOrder.customer_id,
+        name: rawOrder.customer_name,
+        email: rawOrder.customer_email,
+        created_at: rawOrder.customer_created_at
+      },
+      items: orderItems.map(item => ({
+        id: item.id,
+        order_id: item.order_id,
+        product_id: item.product_id,
+        quantity: item.quantity,
+        price: item.price,
+        product: {
+          id: item.product_id,
+          name: item.product_name,
+          price: item.product_price,
+          stock: item.product_stock,
+          created_at: item.product_created_at
+        }
+      }))
     };
 
-    delete (order as any).customer_name;
-    delete (order as any).customer_email;
-    delete (order as any).customer_created_at;
-
     return NextResponse.json(order, { status: 201 });
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error creating order:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Failed to create order';
 
     // Determine if this is a validation error or a server error
-    const errorMessage = error?.message || 'Failed to create order';
     const isValidationError = errorMessage.includes('not found') ||
                               errorMessage.includes('Insufficient stock') ||
                               errorMessage.includes('required');

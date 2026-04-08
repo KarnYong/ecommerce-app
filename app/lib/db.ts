@@ -32,15 +32,13 @@ export type ResultSetHeader = {
   warningStatus: number;
 };
 
-export type RowDataPacket<T = any> = T & {
-  [key: string]: any;
+export type RowDataPacket<T = unknown> = T & {
+  [key: string]: unknown;
 };
 
 // Helper function to execute queries
-export async function query<T = any>(
-  sql: string,
-  params?: any[]
-): Promise<T[]> {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function query<T = unknown>(sql: string, params?: any[]): Promise<T[]> {
   try {
     const [rows] = await pool.execute(sql, params);
     return rows as T[];
@@ -51,19 +49,15 @@ export async function query<T = any>(
 }
 
 // Helper function to get a single row
-export async function queryOne<T = any>(
-  sql: string,
-  params?: any[]
-): Promise<T | null> {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function queryOne<T = unknown>(sql: string, params?: any[]): Promise<T | null> {
   const rows = await query<T>(sql, params);
   return rows.length > 0 ? rows[0] : null;
 }
 
 // Helper function to execute insert/update/delete operations
-export async function execute(
-  sql: string,
-  params?: any[]
-): Promise<ResultSetHeader> {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function execute(sql: string, params?: any[]): Promise<ResultSetHeader> {
   try {
     const [result] = await pool.execute(sql, params);
     return result as ResultSetHeader;

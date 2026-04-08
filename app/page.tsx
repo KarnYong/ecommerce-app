@@ -11,6 +11,14 @@ interface DashboardStats {
   recentOrders: number;
 }
 
+interface Product {
+  stock: number;
+}
+
+interface Order {
+  created_at: string;
+}
+
 export default function Dashboard() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -41,12 +49,12 @@ export default function Dashboard() {
       const orders = await ordersRes.json();
 
       // Calculate low stock products (less than 10)
-      const lowStock = products.filter((p: any) => p.stock < 10).length;
+      const lowStock = products.filter((p: Product) => p.stock < 10).length;
 
       // Calculate recent orders (last 7 days)
       const sevenDaysAgo = new Date();
       sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-      const recentOrders = orders.filter((o: any) => {
+      const recentOrders = orders.filter((o: Order) => {
         const orderDate = new Date(o.created_at);
         return orderDate >= sevenDaysAgo;
       }).length;
