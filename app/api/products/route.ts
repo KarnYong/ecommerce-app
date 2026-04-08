@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { query, execute } from '../../lib/db';
-import type { Product, CreateProductDTO } from '../../lib/types';
+import { query, execute } from '@/lib/db';
+import type { Product, CreateProductDTO } from '@/lib/types';
 
 // GET /api/products - Get all products
 export async function GET() {

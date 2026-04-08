@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { query, execute } from '../../lib/db';
-import type { Customer, CreateCustomerDTO } from '../../lib/types';
+import { query, execute } from '@/lib/db';
+import type { Customer, CreateCustomerDTO } from '@/lib/types';
 
 // GET /api/customers - Get all customers
 export async function GET() {

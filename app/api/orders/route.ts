@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { query, execute, transaction } from '../../lib/db';
-import type { Order, OrderItem, CreateOrderDTO, OrderWithDetails } from '../../lib/types';
+import { query, execute, transaction } from '@/lib/db';
+import type { Order, OrderItem, CreateOrderDTO, OrderWithDetails } from '@/lib/types';
 
 // GET /api/orders - Get all orders with customer and item details
 export async function GET() {

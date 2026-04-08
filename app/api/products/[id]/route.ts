@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { query, execute } from '../../lib/db';
-import type { Product } from '../../lib/types';
+import { query, execute } from '@/lib/db';
+import type { Product } from '@/lib/types';
 
 // GET /api/products/[id] - Get a single product
 export async function GET(
